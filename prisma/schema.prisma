@@ -8,17 +8,34 @@ datasource db {
 }
 
 model User {
-  id           Int       @id @default(autoincrement())
-  username     String    @unique
-  phone        String    @unique
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  phone        String   @unique
   password     String
   avatar       String?
-  status       String    @default("offline") // online, offline, away, busy
-  lastActiveAt DateTime  @default(now())
-  createdAt    DateTime  @default(now())
+  status       String   @default("offline") // online, offline, away, busy
+  lastActiveAt DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  sentMessages     Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
 
   @@index([status])
   @@index([phone])
   @@index([username])
 }
 
+model Message {
+  id         Int      @id @default(autoincrement())
+  content    String   @db.Text
+  senderId   Int
+  receiverId Int
+  createdAt  DateTime @default(now())
+  read       Boolean  @default(false)
+
+  sender   User @relation("SentMessages", fields: [senderId], references: [id])
+  receiver User @relation("ReceivedMessages", fields: [receiverId], references: [id])
+
+  @@index([senderId])
+  @@index([receiverId])
+}
