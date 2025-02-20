@@ -46,23 +46,21 @@ export class AuthService {
       throw new UnauthorizedException('手机号或密码错误');
     }
 
-    await this.prisma.user.update({
+    const updatedUser = await this.prisma.user.update({
       where: { id: user.id },
       data: { status: 'online', lastActiveAt: new Date() },
     });
 
     const token = await this.generateToken(user.id);
-    const lastActiveAt = new Date(user.lastActiveAt);
-    lastActiveAt.setHours(lastActiveAt.getHours() + 8);
 
     return {
       token,
       user: {
-        id: user.id,
-        username: user.username,
-        avatar: user.avatar,
-        phone: user.phone,
-        status: user.status,
+        id: updatedUser.id,
+        username: updatedUser.username,
+        avatar: updatedUser.avatar,
+        phone: updatedUser.phone,
+        status: updatedUser.status,
       },
     };
   }
