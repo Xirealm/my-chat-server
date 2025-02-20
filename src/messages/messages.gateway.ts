@@ -15,7 +15,10 @@ import { SendMessageDto } from './dto/message.dto';
 
 @WebSocketGateway({
   cors: {
-    origin: '*',
+    origin: true, // 允许所有来源
+    credentials: true,
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['Authorization'],
   },
   namespace: '/chat',
 })
@@ -53,18 +56,37 @@ export class MessagesGateway
     const senderId = client.data.userId as number;
     const message = await this.messagesService.sendMessage(senderId, payload);
 
-    this.logger.log(
-      `Message sent from user ${senderId} to user ${payload.receiverId}: ${payload.content.substring(0, 50)}...`,
+    // 获取聊天室所有成员ID
+    const memberIds = await this.messagesService.getChatMemberIds(
+      payload.chatId,
     );
 
-    const receiverSocketId = this.connectedUsers.get(payload.receiverId);
-    if (receiverSocketId) {
-      this.server.to(receiverSocketId).emit('newMessage', message);
-      this.logger.debug(`Message delivered to socket ${receiverSocketId}`);
-    } else {
-      this.logger.debug(`Receiver ${payload.receiverId} is offline`);
-    }
+    // 向所有在线的聊天成员发送消息
+    memberIds.forEach((memberId) => {
+      const memberSocketId = this.connectedUsers.get(memberId);
+      if (memberSocketId && memberSocketId !== client.id) {
+        this.server.to(memberSocketId).emit('newMessage', message);
+      }
+    });
 
     return message;
+  }
+
+  @SubscribeMessage('joinChat')
+  async handleJoinChat(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() chatId: number,
+  ) {
+    await client.join(`chat:${chatId}`);
+    this.logger.debug(`User ${client.data.userId} joined chat ${chatId}`);
+  }
+
+  @SubscribeMessage('leaveChat')
+  async handleLeaveChat(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() chatId: number,
+  ) {
+    await client.leave(`chat:${chatId}`);
+    this.logger.debug(`User ${client.data.userId} left chat ${chatId}`);
   }
 }

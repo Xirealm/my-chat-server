@@ -17,25 +17,57 @@ model User {
   lastActiveAt DateTime @default(now())
   createdAt    DateTime @default(now())
 
-  sentMessages     Message[] @relation("SentMessages")
-  receivedMessages Message[] @relation("ReceivedMessages")
+  sentMessages Message[]    @relation("SentMessages")
+  chatMembers  ChatMember[] @relation("UserChats")
 
   @@index([status])
   @@index([phone])
   @@index([username])
 }
 
-model Message {
-  id         Int      @id @default(autoincrement())
-  content    String   @db.Text
-  senderId   Int
-  receiverId Int
-  createdAt  DateTime @default(now())
-  read       Boolean  @default(false)
+model Chat {
+  id        Int      @id @default(autoincrement())
+  name      String? // 群聊名称，私聊可为空
+  type      String   @default("private") // private或group
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  sender   User @relation("SentMessages", fields: [senderId], references: [id])
-  receiver User @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  messages      Message[]
+  lastMessage   Message?     @relation("LastMessage", fields: [lastMessageId], references: [id])
+  lastMessageId Int?         @unique
+  members       ChatMember[]
+
+  @@index([type])
+}
+
+model ChatMember {
+  id       Int      @id @default(autoincrement())
+  userId   Int
+  chatId   Int
+  role     String   @default("member") // owner, admin, member
+  joinedAt DateTime @default(now())
+
+  user User @relation("UserChats", fields: [userId], references: [id])
+  chat Chat @relation(fields: [chatId], references: [id])
+
+  @@unique([userId, chatId])
+  @@index([userId])
+  @@index([chatId])
+}
+
+model Message {
+  id        Int      @id @default(autoincrement())
+  content   String   @db.Text
+  senderId  Int
+  chatId    Int
+  createdAt DateTime @default(now())
+  read      Boolean  @default(true)
+  type      String   @default("text") // text, file, voice
+
+  sender          User  @relation("SentMessages", fields: [senderId], references: [id])
+  chat            Chat  @relation(fields: [chatId], references: [id])
+  lastMessageChat Chat? @relation("LastMessage")
 
   @@index([senderId])
-  @@index([receiverId])
+  @@index([chatId])
 }

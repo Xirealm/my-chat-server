@@ -62,7 +62,7 @@ export class AuthService {
         username: user.username,
         avatar: user.avatar,
         phone: user.phone,
-        time: lastActiveAt,
+        status: user.status,
       },
     };
   }

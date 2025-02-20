@@ -9,6 +9,14 @@ async function bootstrap() {
     logger: new CustomLogger(),
   });
 
+  // 配置全局CORS
+  app.enableCors({
+    origin: true, // 允许所有来源
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    credentials: true,
+    allowedHeaders: 'Content-Type, Accept, Authorization,',
+  });
+
   app.useGlobalPipes(new ValidationPipe());
   app.useGlobalInterceptors(new TransformInterceptor());
 

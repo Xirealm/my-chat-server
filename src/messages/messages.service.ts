@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SendMessageDto, MessageResponse } from './dto/message.dto';
 
@@ -12,37 +12,72 @@ export class MessagesService {
     senderId: number,
     dto: SendMessageDto,
   ): Promise<MessageResponse> {
-    this.logger.debug(
-      `Creating message: ${JSON.stringify({ senderId, ...dto })}`,
-    );
+    // 验证发送者是否是聊天成员
+    const isMember = await this.prisma.chatMember.findFirst({
+      where: {
+        userId: senderId,
+        chatId: dto.chatId,
+      },
+    });
+
+    if (!isMember) {
+      throw new ForbiddenException('User is not a member of this chat');
+    }
 
     const message = await this.prisma.message.create({
       data: {
         content: dto.content,
         senderId,
-        receiverId: dto.receiverId,
+        chatId: dto.chatId,
+        type: dto.type || 'text',
+      },
+      include: {
+        sender: {
+          select: {
+            id: true,
+            username: true,
+            avatar: true,
+          },
+        },
+        chat: true,
       },
     });
 
-    this.logger.debug(`Message created with ID: ${message.id}`);
+    await this.prisma.chat.update({
+      where: { id: dto.chatId },
+      data: {
+        lastMessageId: message.id,
+        updatedAt: new Date(),
+      },
+    });
+
     return message;
   }
 
-  async getConversation(userId: number, otherId: number) {
-    this.logger.debug(
-      `Fetching conversation between users ${userId} and ${otherId}`,
-    );
+  async getChatMessages(chatId: number) {
+    this.logger.debug(`Fetching messages for chat ${chatId}`);
     return this.prisma.message.findMany({
-      where: {
-        OR: [
-          { senderId: userId, receiverId: otherId },
-          { senderId: otherId, receiverId: userId },
-        ],
+      where: { chatId },
+      include: {
+        sender: {
+          select: {
+            id: true,
+            username: true,
+            avatar: true,
+          },
+        },
       },
-      orderBy: {
-        createdAt: 'asc',
-      },
+      orderBy: { createdAt: 'asc' },
     });
+  }
+
+  async getChatMemberIds(chatId: number): Promise<number[]> {
+    const members = await this.prisma.chatMember.findMany({
+      where: { chatId },
+      select: { userId: true },
+    });
+
+    return members.map((member) => member.userId);
   }
 
   async markAsRead(messageIds: number[]) {

@@ -7,6 +7,7 @@ import { MessagesModule } from './messages/messages.module';
 import { FilesModule } from './files/files.module';
 import { CallsModule } from './calls/calls.module';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { LoggerMiddleware } from './common/middleware/logger.middleware';
     MessagesModule,
     FilesModule,
     CallsModule,
+    ChatModule,
   ],
 })
 export class AppModule implements NestModule {
