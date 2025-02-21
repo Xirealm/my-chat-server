@@ -1,4 +1,4 @@
-import { Injectable, Logger, ForbiddenException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SendMessageDto, MessageResponse } from './dto/message.dto';
 
@@ -12,24 +12,12 @@ export class MessagesService {
     senderId: number,
     dto: SendMessageDto,
   ): Promise<MessageResponse> {
-    // 验证发送者是否是聊天成员
-    const isMember = await this.prisma.chatMember.findFirst({
-      where: {
-        userId: senderId,
-        chatId: dto.chatId,
-      },
-    });
-
-    if (!isMember) {
-      throw new ForbiddenException('User is not a member of this chat');
-    }
-
     const message = await this.prisma.message.create({
       data: {
         content: dto.content,
         senderId,
         chatId: dto.chatId,
-        type: dto.type || 'text',
+        type: 'text', // 默认为文本消息
       },
       include: {
         sender: {
@@ -39,10 +27,10 @@ export class MessagesService {
             avatar: true,
           },
         },
-        chat: true,
       },
     });
 
+    // 更新聊天室最后一条消息
     await this.prisma.chat.update({
       where: { id: dto.chatId },
       data: {
@@ -55,7 +43,6 @@ export class MessagesService {
   }
 
   async getChatMessages(chatId: number) {
-    this.logger.debug(`Fetching messages for chat ${chatId}`);
     return this.prisma.message.findMany({
       where: { chatId },
       include: {
@@ -67,27 +54,8 @@ export class MessagesService {
           },
         },
       },
-      orderBy: { createdAt: 'asc' },
-    });
-  }
-
-  async getChatMemberIds(chatId: number): Promise<number[]> {
-    const members = await this.prisma.chatMember.findMany({
-      where: { chatId },
-      select: { userId: true },
-    });
-
-    return members.map((member) => member.userId);
-  }
-
-  async markAsRead(messageIds: number[]) {
-    this.logger.debug(`Marking messages as read: ${messageIds.join(', ')}`);
-    return this.prisma.message.updateMany({
-      where: {
-        id: { in: messageIds },
-        read: false,
-      },
-      data: { read: true },
+      orderBy: { createdAt: 'desc' },
+      take: 50, // 每次获取最近的50条消息
     });
   }
 }

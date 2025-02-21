@@ -14,10 +14,20 @@ export class ChatService {
           },
         },
       },
+      orderBy: {
+        updatedAt: 'desc',
+      },
       select: {
         id: true,
         type: true,
         updatedAt: true,
+        lastMessage: {
+          select: {
+            content: true,
+            type: true,
+            createdAt: true,
+          },
+        },
         members: {
           where: {
             userId: {
@@ -35,7 +45,6 @@ export class ChatService {
         },
       },
     });
-    console.log(chats);
 
     // 转换数据结构
     return chats.map((chat) => ({
@@ -44,6 +53,12 @@ export class ChatService {
       updatedAt: chat.updatedAt.toLocaleString(),
       avatar: chat.members[0]?.user.avatar || null,
       name: chat.members[0]?.user.username || '未知',
+      lastMessage: chat.lastMessage
+        ? {
+            content: chat.lastMessage.content,
+            type: chat.lastMessage.type,
+          }
+        : null,
     }));
   }
 

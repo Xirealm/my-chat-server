@@ -1,16 +1,12 @@
-import { IsString, IsNotEmpty, IsNumber, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsNumber } from 'class-validator';
 
 export class SendMessageDto {
-  @IsString()
-  @IsNotEmpty()
-  content: string;
-
   @IsNumber()
   chatId: number;
 
   @IsString()
-  @IsOptional()
-  type?: string = 'text';
+  @IsNotEmpty()
+  content: string;
 }
 
 export interface MessageResponse {
@@ -19,11 +15,10 @@ export interface MessageResponse {
   senderId: number;
   chatId: number;
   createdAt: Date;
-  read: boolean;
   type: string;
-  chat?: {
+  sender: {
     id: number;
-    name?: string | null;
-    type: string;
+    username: string;
+    avatar: string | null;
   };
 }

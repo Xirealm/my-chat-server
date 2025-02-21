@@ -11,7 +11,6 @@ export class WsAuthGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const client: Socket = context.switchToWs().getClient();
     const token = this.extractTokenFromHeader(client);
-
     if (!token) {
       throw new WsException('Unauthorized');
     }
@@ -29,6 +28,7 @@ export class WsAuthGuard implements CanActivate {
   }
 
   private extractTokenFromHeader(client: Socket): string | undefined {
+    // 支持两种方式传递token
     const [type, token] = client.handshake.auth.authorization?.split(' ') ?? [];
     return type === 'Bearer' ? token : client.handshake.auth.Authorization;
   }

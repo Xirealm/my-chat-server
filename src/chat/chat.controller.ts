@@ -15,7 +15,7 @@ import { AuthGuard } from '../auth/guards/auth.guard';
 @UseGuards(AuthGuard)
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
-
+  // 获取聊天列表
   @Get()
   async findAll(@Request() req) {
     return this.chatService.findAll(req.user.sub);
