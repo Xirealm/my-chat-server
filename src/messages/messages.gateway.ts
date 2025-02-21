@@ -32,12 +32,12 @@ export class MessagesGateway
   constructor(private messagesService: MessagesService) {}
 
   handleConnection(client: Socket) {
-    const userId = client.data.user;
+    const userId = client.data.userId;
     this.logger.log(`Client connected: ${client.id}, userId: ${userId}`);
   }
 
   handleDisconnect(client: Socket) {
-    const userId = client.data;
+    const userId = client.data.userId;
     this.logger.log(`Client disconnected: ${client.id}, userId: ${userId}`);
   }
 
