@@ -17,8 +17,9 @@ model User {
   lastActiveAt DateTime @default(now())
   createdAt    DateTime @default(now())
 
-  sentMessages Message[]    @relation("SentMessages")
-  chatMembers  ChatMember[] @relation("UserChats")
+  sentMessages  Message[]    @relation("SentMessages")
+  chatMembers   ChatMember[] @relation("UserChats")
+  uploadedFiles File[] // 新增：用户上传的文件
 
   @@index([status])
   @@index([phone])
@@ -63,11 +64,31 @@ model Message {
   createdAt DateTime @default(now())
   read      Boolean  @default(true)
   type      String   @default("text") // text, file, voice
+  fileId    Int? // 新增：关联文件ID
 
   sender          User  @relation("SentMessages", fields: [senderId], references: [id])
   chat            Chat  @relation(fields: [chatId], references: [id])
   lastMessageChat Chat? @relation("LastMessage")
+  file            File? @relation(fields: [fileId], references: [id]) // 新增：文件关联
 
   @@index([senderId])
   @@index([chatId])
+  @@index([fileId]) // 新增：文件ID索引
+}
+
+// 新增：File 模型
+model File {
+  id         Int      @id @default(autoincrement())
+  filename   String // 原始文件名
+  path       String // 存储路径
+  mimetype   String // 文件类型
+  size       Int // 文件大小(字节)
+  uploaderId Int // 上传者ID
+  createdAt  DateTime @default(now())
+
+  uploader User      @relation(fields: [uploaderId], references: [id])
+  messages Message[] // 关联的消息
+
+  @@index([uploaderId])
+  @@index([mimetype])
 }
