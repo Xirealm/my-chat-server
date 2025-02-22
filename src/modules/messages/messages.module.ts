@@ -1,11 +1,13 @@
 import { Module } from '@nestjs/common';
 import { MessagesGateway } from './messages.gateway';
 import { MessagesService } from './messages.service';
+import { ChatService } from '../chat/chat.service';
+import { WsAuthGuard } from './guards/ws-auth.guard';
 import { PrismaModule } from '../../prisma/prisma.module';
 
 @Module({
   imports: [PrismaModule],
-  providers: [MessagesGateway, MessagesService],
+  providers: [MessagesGateway, MessagesService, ChatService, WsAuthGuard],
   exports: [MessagesService],
 })
 export class MessagesModule {}

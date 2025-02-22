@@ -5,6 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class ChatService {
   constructor(private prisma: PrismaService) {}
 
+  // 获取用户的聊天列表
   async findAll(userId: number) {
     const chats = await this.prisma.chat.findMany({
       where: {

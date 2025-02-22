@@ -27,6 +27,22 @@ export class WsAuthGuard implements CanActivate {
     return true;
   }
 
+  async handleConnection(client: Socket): Promise<boolean> {
+    const token = this.extractTokenFromHeader(client);
+    if (!token) {
+      throw new WsException('Unauthorized');
+    }
+
+    try {
+      const payload = await this.jwtService.verifyAsync<JwtPayload>(token);
+      client.data.user = payload;
+      client.data.userId = payload.sub;
+      return true;
+    } catch {
+      throw new WsException('Unauthorized');
+    }
+  }
+
   private extractTokenFromHeader(client: Socket): string | undefined {
     // 支持两种方式传递token
     const [type, token] = client.handshake.auth.authorization?.split(' ') ?? [];

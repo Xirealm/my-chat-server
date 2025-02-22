@@ -13,6 +13,7 @@ import { Server, Socket } from 'socket.io';
 import { MessagesService } from './messages.service';
 import { SendMessageDto } from './dto/message.dto';
 import { WsAuthGuard } from './guards/ws-auth.guard';
+import { ChatService } from '../chat/chat.service';
 
 @WebSocketGateway({
   cors: {
@@ -29,11 +30,33 @@ export class MessagesGateway
 
   private readonly logger = new Logger(MessagesGateway.name);
 
-  constructor(private messagesService: MessagesService) {}
+  constructor(
+    private messagesService: MessagesService,
+    private chatService: ChatService,
+    private wsAuthGuard: WsAuthGuard, // 注入 WsAuthGuard
+  ) {}
 
-  handleConnection(client: Socket) {
-    const userId = client.data.userId;
-    this.logger.log(`Client connected: ${client.id}, userId: ${userId}`);
+  async handleConnection(client: Socket) {
+    try {
+      // 在连接时进行认证
+      await this.wsAuthGuard.handleConnection(client);
+      const userId = client.data.userId;
+      this.logger.log(`Client connected: ${client.id}, userId: ${userId}`);
+
+      // 自动订阅用户参与的所有聊天室
+      const chats = await this.chatService.findAll(userId);
+      for (const chat of chats) {
+        const roomId = `chat:${chat.id}`;
+        await client.join(roomId);
+        this.logger.log(
+          `Auto-subscribed client ${client.id} to chat ${chat.id}`,
+        );
+      }
+    } catch (error) {
+      // 处理连接错误
+      this.logger.error(`Connection error: ${error.message}`);
+      client.disconnect();
+    }
   }
 
   handleDisconnect(client: Socket) {
@@ -49,9 +72,10 @@ export class MessagesGateway
     try {
       const senderId = client.data.userId as number;
       const message = await this.messagesService.sendMessage(senderId, payload);
+      const roomId = `chat:${payload.chatId}`;
 
-      // 只广播消息，不返回数据
-      this.server.emit('newMessage', {
+      // 将消息广播给同一聊天室的所有成员;
+      this.server.to(roomId).emit('newMessage', {
         ...message,
         chatId: payload.chatId,
       });
@@ -65,13 +89,21 @@ export class MessagesGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() chatId: number,
   ) {
+    const userId = client.data.userId;
+
+    // 验证用户是否有权限访问该聊天室
+    const members = await this.chatService.getChatMembers(chatId);
+    const isMember = members.some((member) => member.userId === userId);
+
+    if (!isMember) {
+      throw new WsException('Unauthorized to join this chat');
+    }
+
     const roomId = `chat:${chatId}`;
     await client.join(roomId);
     this.logger.log(`Client ${client.id} subscribed to chat ${chatId}`);
 
-    // 获取聊天历史消息
-    const messages = await this.messagesService.getChatMessages(chatId);
-    return { success: true, messages };
+    return { success: true };
   }
 
   @SubscribeMessage('unsubscribeFromChat')
@@ -83,5 +115,29 @@ export class MessagesGateway
     await client.leave(roomId);
     this.logger.log(`Client ${client.id} unsubscribed from chat ${chatId}`);
     return { success: true };
+  }
+
+  @SubscribeMessage('getChatHistory')
+  async handleGetChatHistory(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() chatId: number,
+  ) {
+    try {
+      const userId = client.data.userId;
+
+      // 验证用户是否有权限访问该聊天室
+      const members = await this.chatService.getChatMembers(chatId);
+      const isMember = members.some((member) => member.userId === userId);
+
+      if (!isMember) {
+        throw new WsException('Unauthorized to access chat messages');
+      }
+
+      const messages = await this.messagesService.getChatMessages(chatId);
+      return { success: true, messages };
+    } catch (error) {
+      this.logger.error(`Error getting messages: ${error.message}`);
+      throw new WsException(error.message);
+    }
   }
 }
