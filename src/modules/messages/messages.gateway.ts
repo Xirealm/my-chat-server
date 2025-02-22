@@ -14,6 +14,7 @@ import { MessagesService } from './messages.service';
 import { SendMessageDto } from './dto/message.dto';
 import { WsAuthGuard } from './guards/ws-auth.guard';
 import { ChatService } from '../chat/chat.service';
+import { FilesService } from '../files/files.service'; // 添加 FilesService
 
 @WebSocketGateway({
   cors: {
@@ -34,6 +35,7 @@ export class MessagesGateway
     private messagesService: MessagesService,
     private chatService: ChatService,
     private wsAuthGuard: WsAuthGuard, // 注入 WsAuthGuard
+    private filesService: FilesService, // 添加 FilesService
   ) {}
 
   async handleConnection(client: Socket) {
@@ -81,6 +83,51 @@ export class MessagesGateway
       });
     } catch (error) {
       throw new WsException(error.message);
+    }
+  }
+
+  @SubscribeMessage('uploadFile')
+  async handleFileUpload(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    payload: {
+      file: ArrayBuffer;
+      filename: string;
+      mimetype: string; // 添加 mimetype
+      chatId: number;
+    },
+  ) {
+    try {
+      const uploaderId = client.data.userId;
+      const buffer = Buffer.from(payload.file);
+      const size = buffer.length;
+
+      // 保存文件
+      const fileInfo = await this.filesService.saveFile({
+        filename: payload.filename,
+        mimetype: payload.mimetype,
+        size,
+        buffer,
+        uploaderId,
+      });
+
+      // 创建文件消息
+      const message = await this.messagesService.createFileMessage({
+        senderId: uploaderId,
+        chatId: payload.chatId,
+        type: 'file',
+        content: fileInfo.filename,
+        fileId: fileInfo.id, // 使用 fileId 替代 fileUrl
+      });
+
+      // 广播消息到聊天室
+      const roomId = `chat:${payload.chatId}`;
+      this.server.to(roomId).emit('newMessage', message);
+
+      return { success: true, message };
+    } catch (error) {
+      this.logger.error(`File upload error: ${error.message}`);
+      throw new WsException('File upload failed');
     }
   }
 

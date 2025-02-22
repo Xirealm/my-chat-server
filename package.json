@@ -26,6 +26,7 @@
     "@nestjs/jwt": "^11.0.0",
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/platform-socket.io": "^11.0.10",
+    "@nestjs/serve-static": "^5.0.3",
     "@nestjs/swagger": "^11.0.4",
     "@nestjs/websockets": "^11.0.10",
     "@prisma/client": "^6.3.1",
@@ -35,7 +36,8 @@
     "class-validator": "^0.14.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "socket.io": "^4.8.1"
+    "socket.io": "^4.8.1",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
