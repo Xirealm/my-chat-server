@@ -21,6 +21,10 @@ import { FilesService } from '../files/files.service'; // 添加 FilesService
     origin: true,
   },
   namespace: '/chat',
+  // 添加 WebSocket 配置
+  maxHttpBufferSize: 1e8, // 100MB
+  pingTimeout: 60000, // 60秒
+  pingInterval: 25000, // 25秒
 })
 @UseGuards(WsAuthGuard)
 export class MessagesGateway
@@ -101,7 +105,6 @@ export class MessagesGateway
       const uploaderId = client.data.userId;
       const buffer = Buffer.from(payload.file);
       const size = buffer.length;
-
       // 保存文件
       const fileInfo = await this.filesService.saveFile({
         filename: payload.filename,
