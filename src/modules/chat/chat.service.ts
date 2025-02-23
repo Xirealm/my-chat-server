@@ -119,11 +119,22 @@ export class ChatService {
       throw new Error('Chat not found or user not authorized');
     }
 
-    // 删除聊天及相关消息
-    await this.prisma.chat.delete({
-      where: {
-        id: chatId,
-      },
+    // 使用事务确保原子性
+    await this.prisma.$transaction(async (tx) => {
+      // 1. 删除所有聊天成员
+      await tx.chatMember.deleteMany({
+        where: { chatId },
+      });
+
+      // 2. 删除所有消息
+      await tx.message.deleteMany({
+        where: { chatId },
+      });
+
+      // 3. 删除聊天本身
+      await tx.chat.delete({
+        where: { id: chatId },
+      });
     });
 
     return { success: true };
