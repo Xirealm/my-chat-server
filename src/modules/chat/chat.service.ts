@@ -158,4 +158,68 @@ export class ChatService {
 
     return chat.members;
   }
+
+  async getHistoryMessages(
+    chatId: number,
+    userId: number,
+    page: number = 1,
+    pageSize: number = 50,
+  ) {
+    // 确保页码和每页数量为有效的数字
+    const validPage = Math.max(1, page);
+    const validPageSize = Math.max(1, Math.min(100, pageSize));
+    const skip = (validPage - 1) * validPageSize;
+
+    // 验证用户是否在这个聊天中
+    const isMember = await this.prisma.chatMember.findFirst({
+      where: {
+        AND: [{ chatId: chatId }, { userId: userId }],
+      },
+    });
+
+    if (!isMember) {
+      throw new NotFoundException('Chat not found or user not authorized');
+    }
+
+    const messages = await this.prisma.message.findMany({
+      where: {
+        chatId: chatId,
+      },
+      include: {
+        sender: {
+          select: {
+            username: true,
+            avatar: true,
+          },
+        },
+        file: true, // 包含文件信息
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: validPageSize,
+      skip: skip, // 使用计算好的 skip 值
+    });
+
+    return messages;
+  }
+
+  async getFileMessage(messageId: number) {
+    const message = await this.prisma.message.findUnique({
+      where: { id: messageId },
+      include: {
+        file: true,
+      },
+    });
+
+    if (!message || !message.file) {
+      throw new NotFoundException('File not found');
+    }
+
+    return {
+      path: message.file.path,
+      filename: message.file.filename,
+      mimetype: message.file.mimetype,
+    };
+  }
 }
