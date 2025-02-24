@@ -164,6 +164,7 @@ export class ChatService {
     userId: number,
     page: number = 1,
     pageSize: number = 50,
+    keyword?: string,
   ) {
     // 确保页码和每页数量为有效的数字
     const validPage = Math.max(1, page);
@@ -184,6 +185,24 @@ export class ChatService {
     const messages = await this.prisma.message.findMany({
       where: {
         chatId: chatId,
+        OR: keyword
+          ? [
+              {
+                content: {
+                  contains: keyword,
+                },
+                type: 'text',
+              },
+              {
+                file: {
+                  filename: {
+                    contains: keyword,
+                  },
+                },
+                type: 'file',
+              },
+            ]
+          : undefined,
       },
       include: {
         sender: {

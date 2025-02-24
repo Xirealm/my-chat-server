@@ -39,6 +39,7 @@ export class ChatController {
     @Param('id') id: string,
     @Query('page') page: string,
     @Query('pageSize') pageSize: string,
+    @Query('keyword') keyword: string,
     @Request() req,
   ) {
     return this.chatService.getHistoryMessages(
@@ -46,6 +47,7 @@ export class ChatController {
       req.user.sub,
       page ? parseInt(page, 10) : 1,
       pageSize ? parseInt(pageSize, 10) : 50,
+      keyword,
     );
   }
 
