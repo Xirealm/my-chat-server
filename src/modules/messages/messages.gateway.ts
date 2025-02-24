@@ -134,6 +134,77 @@ export class MessagesGateway
     }
   }
 
+  @SubscribeMessage('uploadFileChunk')
+  async handleFileChunkUpload(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    payload: {
+      chunk: ArrayBuffer;
+      chunkIndex: number;
+      totalChunks: number;
+      fileId: string;
+    },
+  ) {
+    try {
+      const buffer = Buffer.from(payload.chunk);
+      await this.filesService.saveFileChunk({
+        chunk: buffer,
+        chunkIndex: payload.chunkIndex,
+        totalChunks: payload.totalChunks,
+        fileId: payload.fileId,
+      });
+
+      return { success: true, chunkIndex: payload.chunkIndex };
+    } catch (error) {
+      this.logger.error(`Chunk upload error: ${error.message}`);
+      throw new WsException('Chunk upload failed');
+    }
+  }
+
+  @SubscribeMessage('mergeFileChunks')
+  async handleFileMerge(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    payload: {
+      fileId: string;
+      filename: string;
+      totalChunks: number;
+      mimetype: string;
+      size: number;
+      chatId: number;
+    },
+  ) {
+    try {
+      const uploaderId = client.data.userId;
+      const fileInfo = await this.filesService.mergeFileChunks({
+        fileId: payload.fileId,
+        filename: payload.filename,
+        totalChunks: payload.totalChunks,
+        mimetype: payload.mimetype,
+        size: payload.size,
+        uploaderId,
+      });
+
+      // 创建文件消息
+      const message = await this.messagesService.createFileMessage({
+        senderId: uploaderId,
+        chatId: payload.chatId,
+        type: 'file',
+        content: fileInfo.filename,
+        fileId: fileInfo.id,
+      });
+
+      // 广播消息
+      const roomId = `chat:${payload.chatId}`;
+      this.server.to(roomId).emit('newMessage', message);
+
+      return { success: true, message };
+    } catch (error) {
+      this.logger.error(`File merge error: ${error.message}`);
+      throw new WsException('File merge failed');
+    }
+  }
+
   @SubscribeMessage('subscribeToChat')
   async handleSubscribeToChat(
     @ConnectedSocket() client: Socket,

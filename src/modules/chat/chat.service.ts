@@ -1,8 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import * as fs from 'fs/promises';
+import * as path from 'path'; // 新增：导入 path 模块
 
 @Injectable()
 export class ChatService {
+  private readonly logger = new Logger(ChatService.name);
+
   constructor(private prisma: PrismaService) {}
 
   // 获取用户的聊天列表
@@ -102,6 +106,39 @@ export class ChatService {
     return { chatId: newChat.id };
   }
 
+  private async deleteFileAndChunks(filePath: string) {
+    try {
+      const baseFilePath = path.resolve(process.cwd(), 'uploads');
+      const filename = path.basename(filePath);
+      const fullPath = path.join(baseFilePath, filename);
+      const fileId = path.parse(filename).name; // 使用文件名（不含扩展名）作为 fileId
+      const chunkDir = path.join(baseFilePath, 'chunks', fileId);
+
+      // 删除主文件
+      await fs.access(fullPath);
+      await fs.unlink(fullPath);
+      this.logger.log(`Successfully deleted file: ${fullPath}`);
+
+      // 删除分片目录
+      try {
+        await fs.access(chunkDir);
+        await fs.rm(chunkDir, { recursive: true, force: true });
+        this.logger.log(`Successfully deleted chunk directory: ${chunkDir}`);
+      } catch (error) {
+        if (error.code !== 'ENOENT') {
+          this.logger.warn(
+            `Failed to delete chunk directory: ${chunkDir}`,
+            error,
+          );
+        }
+      }
+    } catch (error) {
+      if (error.code !== 'ENOENT') {
+        this.logger.error(`Error deleting file: ${filePath}`, error);
+      }
+    }
+  }
+
   async deleteChat(chatId: number, userId: number) {
     // 验证用户是否在这个聊天中
     const chat = await this.prisma.chat.findFirst({
@@ -121,17 +158,55 @@ export class ChatService {
 
     // 使用事务确保原子性
     await this.prisma.$transaction(async (tx) => {
-      // 1. 删除所有聊天成员
+      // 1. 获取所有文件消息及其文件信息
+      const fileMessages = await tx.message.findMany({
+        where: {
+          chatId,
+          type: 'file',
+        },
+        include: {
+          file: true,
+        },
+      });
+
+      // 2. 清除 Chat 的 lastMessageId 引用
+      await tx.chat.update({
+        where: { id: chatId },
+        data: { lastMessageId: null },
+      });
+
+      // 3. 删除所有聊天成员
       await tx.chatMember.deleteMany({
         where: { chatId },
       });
 
-      // 2. 删除所有消息
+      // 4. 删除所有消息（这会自动处理 Message 和 File 之间的关系）
       await tx.message.deleteMany({
         where: { chatId },
       });
 
-      // 3. 删除聊天本身
+      // 5. 删除所有文件记录和物理文件
+      for (const message of fileMessages) {
+        if (message.file) {
+          try {
+            // 删除文件和相关分片
+            await this.deleteFileAndChunks(message.file.path);
+
+            // 删除文件记录
+            await tx.file.delete({
+              where: { id: message.file.id },
+            });
+          } catch (error) {
+            this.logger.error(
+              `Error processing file deletion for message ${message.id}:`,
+              error,
+            );
+            // 继续执行，不中断删除过程
+          }
+        }
+      }
+
+      // 6. 删除聊天本身
       await tx.chat.delete({
         where: { id: chatId },
       });
