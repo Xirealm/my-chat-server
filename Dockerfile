@@ -1,3 +1,8 @@
+# 使用 Node 官方镜像作为基础镜像
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
 # 复制依赖文件并安装
 COPY package*.json ./
 COPY prisma ./prisma/
