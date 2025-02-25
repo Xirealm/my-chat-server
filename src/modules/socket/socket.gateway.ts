@@ -13,6 +13,7 @@ import { ChatService } from '../chat/chat.service';
   cors: { origin: true },
   namespace: '/',
   maxHttpBufferSize: 1e8,
+  // 服务端心跳配置
   pingTimeout: 60000,
   pingInterval: 25000,
 })
