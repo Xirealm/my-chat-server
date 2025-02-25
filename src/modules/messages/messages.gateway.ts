@@ -1,73 +1,27 @@
 import {
-  WebSocketGateway,
-  WebSocketServer,
   SubscribeMessage,
-  OnGatewayConnection,
-  OnGatewayDisconnect,
   ConnectedSocket,
   MessageBody,
   WsException,
 } from '@nestjs/websockets';
-import { Logger, UseGuards } from '@nestjs/common';
-import { Server, Socket } from 'socket.io';
+import { UseGuards } from '@nestjs/common';
+import { Socket } from 'socket.io';
+import { SocketGateway } from '../socket/socket.gateway';
 import { MessagesService } from './messages.service';
 import { SendMessageDto } from './dto/message.dto';
-import { WsAuthGuard } from './guards/ws-auth.guard';
+import { WsAuthGuard } from '../socket/guards/ws-auth.guard';
 import { ChatService } from '../chat/chat.service';
 import { FilesService } from '../files/files.service';
 
-@WebSocketGateway({
-  cors: { origin: true }, // 允许跨域
-  namespace: '/chat', // 命名空间
-  // WebSocket 配置
-  maxHttpBufferSize: 1e8, // 100MB
-  pingTimeout: 60000, // 60秒
-  pingInterval: 25000, // 25秒
-})
 @UseGuards(WsAuthGuard)
-export class MessagesGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
-{
-  @WebSocketServer()
-  server: Server;
-
-  private readonly logger = new Logger(MessagesGateway.name);
-
+export class MessagesGateway extends SocketGateway {
   constructor(
-    private messagesService: MessagesService,
-    private chatService: ChatService,
-    private wsAuthGuard: WsAuthGuard, // 注入 WsAuthGuard
-    private filesService: FilesService, // 添加 FilesService
-  ) {}
-
-  // 处理连接事件，用户连接时自动订阅相关聊天室
-  async handleConnection(client: Socket) {
-    try {
-      // 1. 验证用户身份
-      await this.wsAuthGuard.handleConnection(client);
-      const userId = client.data.userId;
-      this.logger.log(`Client connected: ${client.id}, userId: ${userId}`);
-
-      // 2. 自动订阅该用户所在的所有聊天室
-      const chats = await this.chatService.findAll(userId);
-      for (const chat of chats) {
-        const roomId = `chat:${chat.id}`;
-        await client.join(roomId); // Socket.IO房间订阅
-        this.logger.log(
-          `Auto-subscribed client ${client.id} to chat ${chat.id}`,
-        );
-      }
-    } catch (error) {
-      // 验证失败断开连接
-      this.logger.error(`Connection error: ${error.message}`);
-      client.disconnect();
-    }
-  }
-
-  // 处理连接断开
-  handleDisconnect(client: Socket) {
-    const userId = client.data.userId;
-    this.logger.log(`Client disconnected: ${client.id}, userId: ${userId}`);
+    protected override readonly wsAuthGuard: WsAuthGuard,
+    protected override readonly chatService: ChatService,
+    private readonly messagesService: MessagesService,
+    private readonly filesService: FilesService,
+  ) {
+    super(wsAuthGuard, chatService);
   }
 
   // 处理发送消息事件
