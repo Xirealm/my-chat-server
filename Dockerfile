@@ -9,7 +9,7 @@ COPY package*.json ./
  # 设置 npm 镜像源
 RUN npm config set registry https://registry.npmmirror.com
 
-RUN npm install
+RUN npm install 
 
 # 复制所有文件并构建项目 
 COPY . .
