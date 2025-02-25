@@ -8,7 +8,7 @@ COPY package*.json ./
 COPY prisma ./prisma/
 RUN npm ci
 
-# 复制所有文件并构建项目
+# 复制所有文件并构建项目 
 COPY . .
 RUN npm run build
 
