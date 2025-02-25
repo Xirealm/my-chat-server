@@ -2,11 +2,11 @@ import { IsString, IsNotEmpty, IsNumber } from 'class-validator';
 
 export class SendMessageDto {
   @IsNumber()
-  chatId: number;
+  chatId: number; // 聊天室 ID
 
   @IsString()
   @IsNotEmpty()
-  content: string;
+  content: string; // 消息内容
 }
 
 export interface MessageResponse {

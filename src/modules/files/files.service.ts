@@ -47,6 +47,7 @@ export class FilesService {
     }
   }
 
+  // 保存文件分片
   async saveFileChunk(data: {
     chunk: Buffer;
     chunkIndex: number;
@@ -68,6 +69,7 @@ export class FilesService {
     };
   }
 
+  // 合并文件分片
   async mergeFileChunks(data: {
     fileId: string;
     filename: string;

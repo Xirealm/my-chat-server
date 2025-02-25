@@ -8,7 +8,8 @@ export class MessagesService {
 
   constructor(private prisma: PrismaService) {}
 
-  async sendMessage(
+  // 发送消息服务
+  async createMessage(
     senderId: number,
     dto: SendMessageDto,
   ): Promise<MessageResponse> {

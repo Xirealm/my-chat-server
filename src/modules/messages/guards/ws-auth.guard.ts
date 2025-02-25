@@ -8,6 +8,7 @@ import { JwtPayload } from '../../auth/auth.type';
 export class WsAuthGuard implements CanActivate {
   constructor(private jwtService: JwtService) {}
 
+  // 验证WebSocket消息的token（获取userId）
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const client: Socket = context.switchToWs().getClient();
     const token = this.extractTokenFromHeader(client);
@@ -16,8 +17,9 @@ export class WsAuthGuard implements CanActivate {
     }
 
     try {
+      // 验证JWT token
       const payload = await this.jwtService.verifyAsync<JwtPayload>(token);
-      // 存储完整的 payload，与 HTTP guard 保持一致
+      // 将用户信息存储到socket实例中,便于后续使用
       client.data.user = payload;
       client.data.userId = payload.sub;
     } catch {
@@ -27,6 +29,7 @@ export class WsAuthGuard implements CanActivate {
     return true;
   }
 
+  // 验证WebSocket连接的token（获取userId）
   async handleConnection(client: Socket): Promise<boolean> {
     const token = this.extractTokenFromHeader(client);
     if (!token) {
@@ -43,6 +46,7 @@ export class WsAuthGuard implements CanActivate {
     }
   }
 
+  // 从请求头中提取token
   private extractTokenFromHeader(client: Socket): string | undefined {
     // 支持两种方式传递token
     const [type, token] = client.handshake.auth.authorization?.split(' ') ?? [];

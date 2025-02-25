@@ -7,6 +7,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// 用户模型
 model User {
   id           Int      @id @default(autoincrement())
   username     String   @unique
@@ -69,7 +70,7 @@ model Message {
   sender          User  @relation("SentMessages", fields: [senderId], references: [id])
   chat            Chat  @relation(fields: [chatId], references: [id])
   lastMessageChat Chat? @relation("LastMessage")
-  file            File? @relation(fields: [fileId], references: [id]) // 新增：文件关联
+  file            File? @relation(fields: [fileId], references: [id]) // 文件关联
 
   @@index([senderId])
   @@index([chatId])
