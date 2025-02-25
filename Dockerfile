@@ -13,7 +13,7 @@ RUN npm install
 
 # 复制所有文件并构建项目 
 COPY . .
-RUN npm run build
+RUN npm run build 
 
 # 暴露端口
 EXPOSE 3000
