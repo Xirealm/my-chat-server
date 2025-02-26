@@ -11,6 +11,7 @@ import { MessagesModule } from './modules/messages/messages.module';
 import { FilesModule } from './modules/files/files.module';
 import { CallsModule } from './modules/calls/calls.module';
 import { ChatModule } from './modules/chat/chat.module';
+import { FriendsModule } from './modules/friends/friends.module';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 
 @Module({
@@ -25,6 +26,7 @@ import { LoggerMiddleware } from './common/middleware/logger.middleware';
     FilesModule,
     CallsModule,
     ChatModule,
+    FriendsModule,
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'uploads'),
       serveRoot: '/uploads',

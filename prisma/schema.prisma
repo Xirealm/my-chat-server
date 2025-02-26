@@ -18,9 +18,11 @@ model User {
   lastActiveAt DateTime @default(now())
   createdAt    DateTime @default(now())
 
-  sentMessages  Message[]    @relation("SentMessages")
-  chatMembers   ChatMember[] @relation("UserChats")
-  uploadedFiles File[] // 新增：用户上传的文件
+  sentMessages           Message[]    @relation("SentMessages")
+  chatMembers            ChatMember[] @relation("UserChats")
+  uploadedFiles          File[] // 新增：用户上传的文件
+  sentFriendRequests     Friend[]     @relation("UserFriendRequests")
+  receivedFriendRequests Friend[]     @relation("UserFriendReceived")
 
   @@index([status])
   @@index([phone])
@@ -92,4 +94,23 @@ model File {
 
   @@index([uploaderId])
   @@index([mimetype])
+}
+
+// 新增：Friend 模型
+model Friend {
+  id          Int      @id @default(autoincrement())
+  requesterId Int
+  receiverId  Int
+  status      String   @default("pending") // pending, accepted, rejected
+  message     String   @db.Text // 新增：好友请求消息
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  requester User @relation("UserFriendRequests", fields: [requesterId], references: [id])
+  receiver  User @relation("UserFriendReceived", fields: [receiverId], references: [id])
+
+  @@unique([requesterId, receiverId])
+  @@index([requesterId])
+  @@index([receiverId])
+  @@index([status])
 }
