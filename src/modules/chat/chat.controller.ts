@@ -24,9 +24,15 @@ export class ChatController {
     return this.chatService.findAll(req.user.sub);
   }
 
+  // 创建/获取聊天
   @Post('private')
   async createPrivateChat(@Request() req, @Body() body: { userId: number }) {
     return this.chatService.findOrCreatePrivateChat(req.user.sub, body.userId);
+  }
+
+  @Post('group')
+  async createGroupChat(@Request() req, @Body() body: { userIds: number[] }) {
+    return this.chatService.createGroupChat(req.user.sub, body.userIds);
   }
 
   @Delete(':id')

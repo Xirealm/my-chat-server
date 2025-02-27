@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import * as fs from 'fs/promises';
 import * as path from 'path'; // 新增：导入 path 模块
@@ -25,6 +30,7 @@ export class ChatService {
       select: {
         id: true,
         type: true,
+        name: true, // 添加 name 字段
         updatedAt: true,
         lastMessage: {
           select: {
@@ -57,7 +63,10 @@ export class ChatService {
       type: chat.type,
       updatedAt: chat.updatedAt.toLocaleString(),
       avatar: chat.members[0]?.user.avatar || null,
-      name: chat.members[0]?.user.username || '未知',
+      name:
+        chat.type === 'private'
+          ? chat.members[0]?.user.username || '未知'
+          : chat.name,
       lastMessage: chat.lastMessage
         ? {
             content: chat.lastMessage.content,
@@ -104,6 +113,63 @@ export class ChatService {
     });
 
     return { chatId: newChat.id };
+  }
+
+  async createGroupChat(creatorId: number, memberIds: number[]) {
+    // 直接将创建者加入成员列表
+    const allMemberIds = [...memberIds, creatorId];
+
+    // 验证所有用户是否存在
+    const users = await this.prisma.user.findMany({
+      where: {
+        id: {
+          in: allMemberIds,
+        },
+      },
+      select: {
+        id: true,
+        username: true,
+      },
+    });
+
+    if (users.length !== allMemberIds.length) {
+      throw new BadRequestException('部分用户不存在');
+    }
+
+    // 生成群聊名称
+    let groupName =
+      '群：' +
+      users
+        .map((user) => user.username)
+        .join('、')
+        .slice(0, 13); // 调整切片长度以适应新增的前缀
+
+    if (groupName.length === 15 && users.length > 2) {
+      groupName = groupName.slice(0, 12) + '...';
+    }
+
+    // 创建群聊
+    const chat = await this.prisma.chat.create({
+      data: {
+        type: 'group',
+        name: groupName,
+        members: {
+          create: allMemberIds.map((userId) => ({
+            userId,
+            role: userId === creatorId ? 'owner' : 'member',
+          })),
+        },
+      },
+      include: {
+        members: {
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+
+    return chat;
   }
 
   private async deleteFileAndChunks(filePath: string) {
