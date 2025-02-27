@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { writeFile, mkdir, readFile } from 'fs/promises';
-import { createWriteStream } from 'fs';
+import { createWriteStream, createReadStream, statSync } from 'fs';
 import { join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -148,5 +148,63 @@ export class FilesService {
 
   getFileUrl(filename: string): string {
     return `/uploads/${filename}`;
+  }
+
+  async downloadFile(fileId: number, range?: string) {
+    try {
+      const file = await this.prisma.file.findUnique({
+        where: { id: fileId },
+      });
+
+      if (!file) {
+        throw new NotFoundException('File not found');
+      }
+
+      const actualPath = join(
+        process.cwd(),
+        file.path.replace(/^\/uploads/, 'uploads'),
+      );
+
+      try {
+        await fs.access(actualPath);
+      } catch {
+        throw new NotFoundException('File not found on disk');
+      }
+
+      const stat = statSync(actualPath);
+      let stream;
+
+      if (range) {
+        // 解析 Range header
+        const parts = range.replace(/bytes=/, '').split('-');
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : stat.size - 1;
+
+        stream = createReadStream(actualPath, { start, end });
+
+        return {
+          stream,
+          filename: file.filename,
+          mimetype: file.mimetype,
+          size: stat.size,
+          range: {
+            start,
+            end,
+            length: end - start + 1,
+          },
+        };
+      } else {
+        stream = createReadStream(actualPath);
+        return {
+          stream,
+          filename: file.filename,
+          mimetype: file.mimetype,
+          size: stat.size,
+        };
+      }
+    } catch (error) {
+      this.logger.error(`Failed to download file: ${error.message}`);
+      throw error;
+    }
   }
 }
