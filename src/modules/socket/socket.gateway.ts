@@ -3,6 +3,7 @@ import {
   WebSocketServer,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  SubscribeMessage,
 } from '@nestjs/websockets';
 import { Logger, UseGuards } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
@@ -29,6 +30,9 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
     protected readonly chatService: ChatService,
   ) {}
 
+  // 存储聊天室的在线用户
+  private chatOnlineUsers: Map<string, Set<string>> = new Map();
+
   // 处理连接事件，用户连接时自动订阅相关聊天室
   async handleConnection(client: Socket) {
     try {
@@ -42,6 +46,23 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
       for (const chat of chats) {
         const roomId = `chat:${chat.id}`;
         await client.join(roomId); // Socket.IO房间订阅
+        // 获取或创建聊天室的在线用户集合
+        let userSet = this.chatOnlineUsers.get(roomId);
+        if (!userSet) {
+          userSet = new Set<string>();
+          this.chatOnlineUsers.set(roomId, userSet);
+        }
+        // 将用户添加到在线用户集合
+        userSet.add(userId);
+
+        // 获取真实的在线用户数
+        const onlineCount = userSet.size;
+        // 通知房间内所有用户在线状态变化
+        this.server.to(roomId).emit('online_status', {
+          chatId: chat.id,
+          onlineUsers: Array.from(userSet),
+          onlineCount,
+        });
         this.logger.log(
           `Auto-subscribed client ${client.id} to chat ${chat.id}`,
         );
@@ -56,6 +77,36 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // 处理连接断开
   handleDisconnect(client: Socket) {
     const userId = client.data.userId;
+    // 从所有房间的在线用户集合中移除该用户
+    this.chatOnlineUsers.forEach((users, roomId) => {
+      if (users.delete(userId)) {
+        this.server.to(roomId).emit('online_status', {
+          chatId: Number(roomId.replace('chat:', '')),
+          onlineUsers: Array.from(users),
+          onlineCount: users.size,
+        });
+      }
+    });
     this.logger.log(`Client disconnected: ${client.id}, userId: ${userId}`);
+  }
+
+  // 添加获取所有聊天室在线状态的方法
+  @SubscribeMessage('getOnlineStatus')
+  async handleGetOnlineStatus(client: Socket) {
+    const userId = client.data.userId;
+    const chats = await this.chatService.findAll(userId);
+
+    const statuses = chats.map((chat) => {
+      const roomId = `chat:${chat.id}`;
+      const userSet = this.chatOnlineUsers.get(roomId) || new Set();
+
+      return {
+        chatId: chat.id,
+        onlineUsers: Array.from(userSet),
+        onlineCount: userSet.size,
+      };
+    });
+
+    return statuses;
   }
 }
