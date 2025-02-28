@@ -138,7 +138,7 @@ export class ChatService {
 
     // 生成群聊名称
     let groupName =
-      '群：' +
+      '群聊：' +
       users
         .map((user) => user.username)
         .join('、')
