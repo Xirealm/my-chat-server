@@ -8,7 +8,6 @@ import { FRIEND_ERROR_MESSAGES } from '../constants/friend.constants';
 export class FriendRequestService {
   constructor(private prisma: PrismaService) {}
 
-  // 修改方法签名，requesterId作为独立参数
   async createFriendRequest(
     requesterId: number,
     { receiverId, message }: Omit<CreateFriendRequestDto, 'requesterId'>,
@@ -17,7 +16,6 @@ export class FriendRequestService {
       throw new FriendOperationException(FRIEND_ERROR_MESSAGES.CANNOT_ADD_SELF);
     }
 
-    // 检查接收者是否存在
     const receiver = await this.prisma.user.findUnique({
       where: { id: receiverId },
     });
@@ -26,7 +24,33 @@ export class FriendRequestService {
       throw new FriendOperationException(FRIEND_ERROR_MESSAGES.USER_NOT_FOUND);
     }
 
-    await this.checkExistingRelations(requesterId, receiverId);
+    const existingRelation = await this.checkExistingRelations(
+      requesterId,
+      receiverId,
+    );
+
+    if (existingRelation) {
+      // 如果是被拒绝的请求，更新它而不是创建新的
+      if (existingRelation.status === 'rejected') {
+        return this.prisma.friend.update({
+          where: { id: existingRelation.id },
+          data: {
+            status: 'pending',
+            message,
+          },
+          include: {
+            requester: {
+              select: {
+                id: true,
+                username: true,
+                avatar: true,
+              },
+            },
+          },
+        });
+      }
+      return existingRelation;
+    }
 
     return this.prisma.friend.create({
       data: {
@@ -72,5 +96,7 @@ export class FriendRequestService {
         );
       }
     }
+
+    return existingRelation;
   }
 }
