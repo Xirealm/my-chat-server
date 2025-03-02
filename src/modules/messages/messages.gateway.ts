@@ -227,8 +227,17 @@ export class MessagesGateway extends SocketGateway {
       throw new WsException('Unauthorized to join this chat');
     }
 
-    // 加入Socket.IO房间
+    // 检查用户是否已经订阅了该聊天室
     const roomId = `chat:${chatId}`;
+    const rooms = client.rooms;
+    if (rooms.has(roomId)) {
+      this.logger.log(
+        `Client ${client.id} already subscribed to chat ${chatId}`,
+      );
+      return { success: true, alreadySubscribed: true };
+    }
+
+    // 加入Socket.IO房间
     await client.join(roomId);
 
     // 更新在线用户状态
@@ -247,7 +256,7 @@ export class MessagesGateway extends SocketGateway {
     });
 
     this.logger.log(`Client ${client.id} subscribed to chat ${chatId}`);
-    return { success: true };
+    return { success: true, alreadySubscribed: false };
   }
 
   // 取消订阅聊天室

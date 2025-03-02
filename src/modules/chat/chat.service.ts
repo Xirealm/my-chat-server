@@ -76,6 +76,26 @@ export class ChatService {
     }));
   }
 
+  // 获取用户指定数量的的聊天列表
+  async findByNumber(userId: number, number: number) {
+    const chats = await this.prisma.chat.findMany({
+      where: {
+        members: {
+          some: {
+            userId: userId,
+          },
+        },
+      },
+      orderBy: {
+        updatedAt: 'desc',
+      },
+      take: number,
+    });
+    return chats.map((chat) => ({
+      id: chat.id,
+    }));
+  }
+
   // 创建或查找私聊
   async findOrCreatePrivateChat(user1Id: number, user2Id: number) {
     // 查找现有的私聊
