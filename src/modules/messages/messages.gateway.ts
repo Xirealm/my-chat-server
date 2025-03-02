@@ -8,10 +8,10 @@ import { UseGuards } from '@nestjs/common';
 import { Socket } from 'socket.io';
 import { SocketGateway } from '../socket/socket.gateway';
 import { MessagesService } from './messages.service';
-import { SendMessageDto } from './dto/message.dto';
 import { WsAuthGuard } from '../socket/guards/ws-auth.guard';
 import { ChatService } from '../chat/chat.service';
 import { FilesService } from '../files/files.service';
+import { MessageCrypto } from '../../utils/crypto';
 
 @UseGuards(WsAuthGuard)
 export class MessagesGateway extends SocketGateway {
@@ -28,9 +28,10 @@ export class MessagesGateway extends SocketGateway {
   @SubscribeMessage('sendMessage')
   async handleMessage(
     @ConnectedSocket() client: Socket,
-    @MessageBody() payload: SendMessageDto,
+    @MessageBody() encryptedPayload: string,
   ) {
     try {
+      const payload = MessageCrypto.decrypt(encryptedPayload);
       const senderId = client.data.userId;
 
       // 1. 获取聊天室成员
@@ -73,10 +74,11 @@ export class MessagesGateway extends SocketGateway {
       }
 
       // 4. 广播消息给聊天室所有成员
-      this.server.to(roomId).emit('newMessage', {
+      const encryptedMessage = MessageCrypto.encrypt({
         ...message,
         chatId: payload.chatId,
       });
+      this.server.to(roomId).emit('newMessage', encryptedMessage);
 
       // 5. 广播在线状态更新
       const userSet = this.chatOnlineUsers.get(roomId);
@@ -139,26 +141,20 @@ export class MessagesGateway extends SocketGateway {
 
   // 分片上传大文件
   @SubscribeMessage('uploadFileChunk')
-  async handleFileChunkUpload(
-    @MessageBody()
-    payload: {
-      chunk: ArrayBuffer;
-      chunkIndex: number;
-      totalChunks: number;
-      fileId: string;
-    },
-  ) {
+  async handleFileChunkUpload(@MessageBody() payload: string) {
     try {
-      const buffer = Buffer.from(payload.chunk);
+      const { chunk, chunkIndex, totalChunks, fileId } = JSON.parse(payload);
+      const decryptedChunk = MessageCrypto.decryptFileChunk(chunk);
+
       // 保存单个文件分片
       await this.filesService.saveFileChunk({
-        chunk: buffer,
-        chunkIndex: payload.chunkIndex,
-        totalChunks: payload.totalChunks,
-        fileId: payload.fileId,
+        chunk: decryptedChunk,
+        chunkIndex,
+        totalChunks,
+        fileId,
       });
 
-      return { success: true, chunkIndex: payload.chunkIndex };
+      return { success: true, chunkIndex };
     } catch (error) {
       this.logger.error(`Chunk upload error: ${error.message}`);
       throw new WsException('Chunk upload failed');
@@ -169,42 +165,33 @@ export class MessagesGateway extends SocketGateway {
   @SubscribeMessage('mergeFileChunks')
   async handleFileMerge(
     @ConnectedSocket() client: Socket,
-    @MessageBody()
-    payload: {
-      fileId: string;
-      filename: string;
-      totalChunks: number;
-      mimetype: string;
-      size: number;
-      chatId: number;
-    },
+    @MessageBody() payload: string,
   ) {
     try {
+      const data = JSON.parse(payload);
       const uploaderId = client.data.userId;
+
       // 合并文件分片
       const fileInfo = await this.filesService.mergeFileChunks({
-        fileId: payload.fileId,
-        filename: payload.filename,
-        totalChunks: payload.totalChunks,
-        mimetype: payload.mimetype,
-        size: payload.size,
+        ...data,
         uploaderId,
       });
 
       // 创建文件消息
       const message = await this.messagesService.createFileMessage({
         senderId: uploaderId,
-        chatId: payload.chatId,
+        chatId: data.chatId,
         type: 'file',
         content: fileInfo.filename,
         fileId: fileInfo.id,
       });
 
       // 广播消息
-      const roomId = `chat:${payload.chatId}`;
-      this.server.to(roomId).emit('newMessage', message);
+      const roomId = `chat:${data.chatId}`;
+      const encryptedMessage = MessageCrypto.encrypt(message);
+      this.server.to(roomId).emit('newMessage', encryptedMessage);
 
-      return { success: true, message };
+      return { success: true, message: encryptedMessage };
     } catch (error) {
       this.logger.error(`File merge error: ${error.message}`);
       throw new WsException('File merge failed');

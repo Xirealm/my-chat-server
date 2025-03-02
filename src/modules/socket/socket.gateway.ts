@@ -46,7 +46,7 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.logger.log(`Client connected: ${client.id}, userId: ${userId}`);
 
       // 2. 自动订阅该用户所在的所有聊天室
-      const chats = await this.chatService.findByNumber(userId, 3);
+      const chats = await this.chatService.findByNumber(userId, 5);
       for (const chat of chats) {
         const roomId = `chat:${chat.id}`;
         await client.join(roomId); // Socket.IO房间订阅

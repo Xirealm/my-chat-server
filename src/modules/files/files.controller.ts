@@ -10,7 +10,7 @@ import {
 import { Response } from 'express';
 import { FilesService } from './files.service';
 
-// 添加文件数据接口
+// 文件数据接口
 interface FileData {
   stream: NodeJS.ReadableStream;
   filename: string;
@@ -23,7 +23,7 @@ interface FileData {
   };
 }
 
-@Controller() // 移除 'files' 前缀，使用完整路径
+@Controller()
 export class FilesController {
   private readonly logger = new Logger(FilesController.name);
 
