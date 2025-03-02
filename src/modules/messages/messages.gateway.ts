@@ -32,17 +32,61 @@ export class MessagesGateway extends SocketGateway {
   ) {
     try {
       const senderId = client.data.userId;
-      // 1. 保存消息到数据库
+
+      // 1. 获取聊天室成员
+      const members = await this.chatService.getChatMembers(payload.chatId);
+
+      // 2. 保存消息到数据库
       const message = await this.messagesService.createMessage(
         senderId,
         payload,
       );
-      // 2. 广播消息给聊天室所有成员
+
+      // 3. 确保所有成员都订阅了该聊天室
       const roomId = `chat:${payload.chatId}`;
+      const connectedClients = await this.server.fetchSockets();
+
+      for (const member of members) {
+        // 跳过发送者，因为发送者已经订阅
+        if (member.userId === senderId) continue;
+
+        // 查找该成员的socket连接
+        const memberSockets = connectedClients.filter(
+          (socket) => socket.data.userId === member.userId,
+        );
+
+        // 如果成员在线，让其加入房间
+        for (const socket of memberSockets) {
+          socket.join(roomId);
+          this.logger.log(
+            `Auto-subscribed client ${socket.id} to chat ${payload.chatId}`,
+          );
+
+          // 更新在线用户列表
+          let userSet = this.chatOnlineUsers.get(roomId);
+          if (!userSet) {
+            userSet = new Set<string>();
+            this.chatOnlineUsers.set(roomId, userSet);
+          }
+          userSet.add(member.userId.toString());
+        }
+      }
+
+      // 4. 广播消息给聊天室所有成员
       this.server.to(roomId).emit('newMessage', {
         ...message,
         chatId: payload.chatId,
       });
+
+      // 5. 广播在线状态更新
+      const userSet = this.chatOnlineUsers.get(roomId);
+      if (userSet) {
+        this.server.to(roomId).emit('online_status', {
+          chatId: payload.chatId,
+          onlineUsers: Array.from(userSet),
+          onlineCount: userSet.size,
+        });
+      }
     } catch (error) {
       throw new WsException(error.message);
     }
@@ -186,8 +230,23 @@ export class MessagesGateway extends SocketGateway {
     // 加入Socket.IO房间
     const roomId = `chat:${chatId}`;
     await client.join(roomId);
-    this.logger.log(`Client ${client.id} subscribed to chat ${chatId}`);
 
+    // 更新在线用户状态
+    let userSet = this.chatOnlineUsers.get(roomId);
+    if (!userSet) {
+      userSet = new Set<string>();
+      this.chatOnlineUsers.set(roomId, userSet);
+    }
+    userSet.add(userId.toString());
+
+    // 广播在线状态更新
+    this.server.to(roomId).emit('online_status', {
+      chatId: chatId,
+      onlineUsers: Array.from(userSet),
+      onlineCount: userSet.size,
+    });
+
+    this.logger.log(`Client ${client.id} subscribed to chat ${chatId}`);
     return { success: true };
   }
 
@@ -205,8 +264,22 @@ export class MessagesGateway extends SocketGateway {
     if (!isMember) {
       throw new WsException('Unauthorized to join this chat');
     }
+
     const roomId = `chat:${chatId}`;
     await client.leave(roomId);
+
+    // 更新在线用户状态
+    const userSet = this.chatOnlineUsers.get(roomId);
+    if (userSet) {
+      userSet.delete(userId.toString());
+      // 广播在线状态更新
+      this.server.to(roomId).emit('online_status', {
+        chatId: chatId,
+        onlineUsers: Array.from(userSet),
+        onlineCount: userSet.size,
+      });
+    }
+
     this.logger.log(`Client ${client.id} unsubscribed from chat ${chatId}`);
     return { success: true };
   }

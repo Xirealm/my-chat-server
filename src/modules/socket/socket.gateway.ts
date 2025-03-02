@@ -31,7 +31,7 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {}
 
   // 存储聊天室的在线用户
-  private chatOnlineUsers: Map<string, Set<string>> = new Map();
+  protected chatOnlineUsers: Map<string, Set<string>> = new Map();
 
   // 处理连接事件，用户连接时自动订阅相关聊天室
   async handleConnection(client: Socket) {
