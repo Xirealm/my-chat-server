@@ -65,10 +65,10 @@ export class MessagesGateway extends SocketGateway {
           // 更新在线用户列表
           let userSet = this.chatOnlineUsers.get(roomId);
           if (!userSet) {
-            userSet = new Set<string>();
+            userSet = new Set<number>();
             this.chatOnlineUsers.set(roomId, userSet);
           }
-          userSet.add(member.userId.toString());
+          userSet.add(member.userId);
         }
       }
 
@@ -234,7 +234,7 @@ export class MessagesGateway extends SocketGateway {
     // 更新在线用户状态
     let userSet = this.chatOnlineUsers.get(roomId);
     if (!userSet) {
-      userSet = new Set<string>();
+      userSet = new Set<number>();
       this.chatOnlineUsers.set(roomId, userSet);
     }
     userSet.add(userId.toString());

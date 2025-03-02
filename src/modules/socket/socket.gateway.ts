@@ -31,7 +31,7 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {}
 
   // 存储聊天室的在线用户
-  protected chatOnlineUsers: Map<string, Set<string>> = new Map();
+  protected chatOnlineUsers: Map<string, Set<number>> = new Map();
 
   // 处理连接事件，用户连接时自动订阅相关聊天室
   async handleConnection(client: Socket) {
@@ -49,7 +49,7 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
         // 获取或创建聊天室的在线用户集合
         let userSet = this.chatOnlineUsers.get(roomId);
         if (!userSet) {
-          userSet = new Set<string>();
+          userSet = new Set<number>();
           this.chatOnlineUsers.set(roomId, userSet);
         }
         // 将用户添加到在线用户集合
