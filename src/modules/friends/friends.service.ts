@@ -74,12 +74,9 @@ export class FriendsService {
       },
     });
 
-    return friends.map((friend) => ({
-      id: friend.id,
-      friend:
-        friend.requesterId === userId ? friend.receiver : friend.requester,
-      createdAt: friend.createdAt,
-    }));
+    return friends.map((friend) => {
+      return friend.requesterId === userId ? friend.receiver : friend.requester;
+    });
   }
 
   async getPendingRequests(userId: number) {
