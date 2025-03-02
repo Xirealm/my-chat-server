@@ -4,6 +4,7 @@ import {
   OnGatewayConnection,
   OnGatewayDisconnect,
   SubscribeMessage,
+  MessageBody,
 } from '@nestjs/websockets';
 import { Logger, UseGuards } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
@@ -90,23 +91,16 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.logger.log(`Client disconnected: ${client.id}, userId: ${userId}`);
   }
 
-  // 添加获取所有聊天室在线状态的方法
-  @SubscribeMessage('getOnlineStatus')
-  async handleGetOnlineStatus(client: Socket) {
-    const userId = client.data.userId;
-    const chats = await this.chatService.findAll(userId);
-
-    const statuses = chats.map((chat) => {
-      const roomId = `chat:${chat.id}`;
-      const userSet = this.chatOnlineUsers.get(roomId) || new Set();
-
-      return {
-        chatId: chat.id,
-        onlineUsers: Array.from(userSet),
-        onlineCount: userSet.size,
-      };
-    });
-
-    return statuses;
+  // 获取指定聊天室在线状态
+  @SubscribeMessage('getChatOnlineStatus')
+  handleGetChatOnlineStatus(@MessageBody() chatId: number) {
+    const roomId = `chat:${chatId}`;
+    const userSet = this.chatOnlineUsers.get(roomId) || new Set();
+    const status = {
+      chatId,
+      onlineUsers: Array.from(userSet),
+      onlineCount: userSet.size,
+    };
+    return status;
   }
 }
