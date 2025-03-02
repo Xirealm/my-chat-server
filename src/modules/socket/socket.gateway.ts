@@ -30,6 +30,9 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
     protected readonly wsAuthGuard: WsAuthGuard,
     protected readonly chatService: ChatService,
   ) {}
+  getServer() {
+    return this.server;
+  }
 
   // 存储聊天室的在线用户
   protected chatOnlineUsers: Map<string, Set<number>> = new Map();
