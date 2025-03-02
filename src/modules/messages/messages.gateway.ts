@@ -55,7 +55,7 @@ export class MessagesGateway extends SocketGateway {
           (socket) => socket.data.userId === member.userId,
         );
 
-        // 如果成员在线，让其加入房间
+        // 将在线的成员加入房间
         for (const socket of memberSockets) {
           socket.join(roomId);
           this.logger.log(

@@ -11,13 +11,17 @@ import {
   Res,
 } from '@nestjs/common';
 import { ChatService } from './chat.service';
+import { ChatGateway } from './chat.gateway';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { Response } from 'express';
 
 @Controller('chats')
 @UseGuards(AuthGuard)
 export class ChatController {
-  constructor(private readonly chatService: ChatService) {}
+  constructor(
+    private readonly chatService: ChatService,
+    private readonly chatGateway: ChatGateway,
+  ) {}
   // 获取聊天列表
   @Get()
   async findAll(@Request() req) {
@@ -27,12 +31,21 @@ export class ChatController {
   // 创建/获取聊天
   @Post('private')
   async createPrivateChat(@Request() req, @Body() body: { userId: number }) {
-    return this.chatService.findOrCreatePrivateChat(req.user.sub, body.userId);
+    const chat = await this.chatService.findOrCreatePrivateChat(
+      req.user.sub,
+      body.userId,
+    );
+    await this.chatGateway.notifyNewChat(chat, [req.user.sub, body.userId]);
+    return chat;
   }
-
   @Post('group')
   async createGroupChat(@Request() req, @Body() body: { userIds: number[] }) {
-    return this.chatService.createGroupChat(req.user.sub, body.userIds);
+    const chat = await this.chatService.createGroupChat(
+      req.user.sub,
+      body.userIds,
+    );
+    await this.chatGateway.notifyGroupNewChat(chat, body.userIds);
+    return chat;
   }
 
   @Delete(':id')
