@@ -246,7 +246,7 @@ export class MessagesGateway extends SocketGateway {
       userSet = new Set<number>();
       this.chatOnlineUsers.set(roomId, userSet);
     }
-    userSet.add(userId.toString());
+    userSet.add(userId);
 
     // 广播在线状态更新
     this.server.to(roomId).emit('online_status', {
@@ -280,7 +280,7 @@ export class MessagesGateway extends SocketGateway {
     // 更新在线用户状态
     const userSet = this.chatOnlineUsers.get(roomId);
     if (userSet) {
-      userSet.delete(userId.toString());
+      userSet.delete(userId);
       // 广播在线状态更新
       this.server.to(roomId).emit('online_status', {
         chatId: chatId,
